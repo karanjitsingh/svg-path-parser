@@ -2,9 +2,15 @@
 <html lang="en">
 <head>
 	<meta charset="UTF-8">
-	<title>$Title$</title>
+	<title>Title</title>
 </head>
 <body>
-$END$
+	<canvas id="canvas"></canvas>
 </body>
+<script>
+	var canvas = document.getElementById("canvas");
+	var ctx = canvas.getContext("2d");
+
+	parser.doMagic(ctx, "M 10 10 H 90 V 90");
+</script>
 </html>
