@@ -84,7 +84,7 @@ var parser = {
 					break;
 				case 's':
 				case 'S':
-					if(prevCommand === 's' || prevCommand === 'S' || prevCommand === 'C' || prevCommand === 'c') {
+					if (prevCommand === 's' || prevCommand === 'S' || prevCommand === 'C' || prevCommand === 'c') {
 						//Reflection of previous control point
 						cpx1 = 2 * (x) - cpx2;
 						cpy1 = 2 * (y) - cpy2;
@@ -104,13 +104,51 @@ var parser = {
 					ctx.bezierCurveTo(cpx1, cpy1, cpx2, cpy2, x1, y1);
 
 					x = x1;
-					y = y1
+					y = y1;
 
 					break;
+				case 'q':
+				case 'Q':
+					cpx1 = getNextPoint() + rx;
+					cpy1 = getNextPoint() + ry;
 
+					x1 = getNextPoint() + rx;
+					y1 = getNextPoint() + ry;
+
+					ctx.quadraticCurveTo(cpx1, cpy1, x1, y1);
+
+					x = x1;
+					y = y1;
+					break;
+				case 't':
+				case 'T':
+					if (prevCommand === 'T' || prevCommand === 't' || prevCommand === 'Q' || prevCommand === 'q') {
+						//Reflection of previous control point
+						cpx1 = 2 * (x) - cpx1;
+						cpy1 = 2 * (y) - cpy1;
+					}
+					else {
+						//Assume cp1 to be coincident with current point
+						cpx1 = x;
+						cpy1 = y;
+					}
+
+					x1 = getNextPoint() + rx;
+					y1 = getNextPoint() + ry;
+
+					ctx.quadraticCurveTo(cpx1, cpy1, x1, y1);
+
+					x = x1;
+					y = y1;
+
+					break;
+				case 'a':
+				case 'A':
+					ctx.ar
+					break;
 				case 'z':
 				case 'Z':
-					console.log("DONE!")
+					console.log("DONE!");
 					ctx.closePath();
 					return;
 					break;
