@@ -27,48 +27,39 @@ var parser = {
 			}
 			else
 				path.unshift(symbol);
+
+			var rx, ry;
+			rx = ry = 0;
+
+			if(command.toLowerCase() === command) {
+				rx = x;
+				ry = y;
+			}
+
 			switch (command) {
-				case 'M':
-					x = path.getNextPoint();
-					y = path.getNextPoint();
-					console.log("Move to ", x, y);
-					break;
 				case 'm':
-					x += path.getNextPoint();
-					y += path.getNextPoint();
+				case 'M':
+					x = path.getNextPoint() + rx;
+					y = path.getNextPoint() + ry;
 					console.log("Move to ", x, y);
 					break;
 				case 'l':
-					var x1 = x + path.getNextPoint();
-					var y1 = y + path.getNextPoint();
-					console.log("Draw line ", x, y, x1, y1);
-					x = x1;
-					y = y1;
-					break;
 				case 'L':
-					var x1 = path.getNextPoint();
-					var y1 = path.getNextPoint();
+					var x1 = path.getNextPoint() + rx;
+					var y1 = path.getNextPoint() + ry;
 					console.log("Draw line ", x, y, x1, y1);
 					x = x1;
 					y = y1;
 					break;
 				case 'h':
-					var x1 = x + path.getNextPoint();
-					console.log("Draw line ", x, y, x1, y);
-					x = x1;
-					break;
 				case 'H':
-					var x1 = path.getNextPoint();
+					var x1 = path.getNextPoint() + rx;
 					console.log("Draw line ", x, y, x1, y);
 					x = x1;
 					break;
 				case 'v':
-					var y1 = y + path.getNextPoint();
-					console.log("Draw line ", x, y, x, y1);
-					y = y1;
-					break;
 				case 'V':
-					var y1 = path.getNextPoint();
+					var y1 = path.getNextPoint() + ry;
 					console.log("Draw line ", x, y, x, y1);
 					y = y1;
 					break;
