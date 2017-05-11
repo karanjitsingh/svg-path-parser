@@ -1,3 +1,7 @@
+function isNumber(n){
+	return String(parseFloat(n)) === n;
+}
+
 var parser = {
 	doMagic: function(ctx, path) {
 		ctx.save();
@@ -12,9 +16,18 @@ var parser = {
 		};
 
 		console.log(path);
+		var command='', symbol;
 
-		while(path.length)
-			switch (path.shift()) {
+		while(path.length) {
+			symbol = path.shift();
+			if(!isNumber(symbol)) {
+				if (symbol.length > 1)
+					path.unshift(symbol.substr(1));
+				command = symbol[0];
+			}
+			else
+				path.unshift(symbol);
+			switch (command) {
 				case 'M':
 					x = path.getNextPoint();
 					y = path.getNextPoint();
@@ -67,9 +80,13 @@ var parser = {
 				default:
 					console.log("Error in parsing");
 					ctx.restore();
+
+					console.log(path);
+					return;
+			}
 		}
 		ctx.closePath();
-	},
+	}
 };
 var ctx = {
 	save: function () {
@@ -86,4 +103,4 @@ var ctx = {
 	}
 };
 
-parser.doMagic(ctx, "M 10 10 H 90 V 90");
+parser.doMagic(ctx, "M 10 10 H 90 100 V 90");
