@@ -3,14 +3,86 @@
 <head>
 	<meta charset="UTF-8">
 	<title>Title</title>
+	<style>
+		html, body {
+			height: 100%;
+			margin: 0;
+			padding: 0;
+		}
+
+		.canvas-container {
+			height: calc(100% - 200px);
+			display: inline-block;
+			width: 50%;
+			border-right: 1px solid #000;
+		}
+
+		.svg-container {
+			height: calc(100% - 200px);
+			display: inline-block;
+			width: 50%;
+			position: absolute;
+			top: 0;
+			right: 0
+		}
+
+		#path-editor {
+			position: absolute;
+			left: 0;
+			bottom: 0;
+			height: 200px;
+			background: #fafafa;
+			outline: none;
+			padding: 5px;
+			width: 100%;
+			font-family: Consolas;
+			font-size: 12px;
+			box-shadow: 0px 0px 10px #000;
+		}
+
+		.svg-container svg {
+			height: 100%;
+			width: 100%;
+		}
+	</style>
+	<script src="src/parse.js"></script>
 </head>
 <body>
+<div class="canvas-container">
 	<canvas id="canvas"></canvas>
+</div>
+<div class="svg-container">
+	<svg>
+		<path fill="none" id="path" stroke="#000" stroke-width="2"></path>
+	</svg>
+</div>
+<div spellcheck="false" contenteditable="true" id="path-editor">M 10 10 H 90 20 V 90 z</div>
 </body>
 <script>
+
+	var editor = document.getElementById('path-editor');
 	var canvas = document.getElementById("canvas");
 	var ctx = canvas.getContext("2d");
+	var path = document.getElementById('path');
 
-	parser.doMagic(ctx, "M 10 10 H 90 V 90");
+	function parse() {
+		var d = editor.innerText;
+		ctx.clearRect(0,0,canvas.width,canvas.height);
+		path.setAttribute('d', d);
+		parser.doMagic(ctx, d);
+		ctx.stroke();
+	}
+
+	canvas.width = document.body.clientWidth / 2;
+	canvas.height = document.body.clientHeight;
+	ctx.strokeWidth = 2;
+	ctx.strokeStyle = "#000000";
+
+	editor.onkeyup = function () {
+		parse();
+	}
+
+	parse();
+
 </script>
 </html>
