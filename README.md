@@ -7,7 +7,7 @@ Mapping ```move```, ```line```, ```cubic-bezier``` and ```quadratic-bezier``` fr
 
 Mapping ```elliptical-arc``` command was however a bit more complex. There is no support for elliptical arcs in the interface so I decided to draw the elliptical arc as a series of bezier curves with a help of a few references.
 
-Sadly approximating elliptical arcs with bezier curves results in a significant amount of error, not sure whether this is due to limitation of float precision in javascript or just the inability of bezier curves to perfectly represent an elliptical arc.
+Sadly approximating elliptical arcs with bezier curves results in a significant amount of error for large arcs, not sure whether this is due to limitation of float precision in javascript or just the inability of bezier curves to perfectly represent an elliptical arc.
 
 ![screenshot](http://i.imgur.com/0B1YAfR.png)
 
