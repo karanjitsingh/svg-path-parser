@@ -1,6 +1,4 @@
-function isNumber(n) {
-	return String(parseFloat(n)) === n;
-}
+
 
 var parser = {
 	doMagic: function (ctx, path) {
@@ -11,19 +9,19 @@ var parser = {
 
 		path = path.split(',').join(' ').split('\n').join(' ').split(' ');
 
+		function isNumber(n) { return String(parseFloat(n)) === n; }
 		function getNextPoint() { return parseFloat(path.shift()); }
 		function getNextFlag() { return parseInt(path.shift()); }
-		function drawEllipticalArc(rx, ry, phi, flagA, flagS, x1, y1, x2, y2) {
+
+		function generateBezierPoints(rx, ry, phi, flagA, flagS, x1, y1, x2, y2) {
 
 			function clamp(value, min, max) {
-				Math.min(Math.max(value, min), max)
+				return Math.min(Math.max(value, min), max)
 			}
 
 			function svgAngle(ux, uy, vx, vy ) {
 				var dot = ux*vx + uy*vy;
 				var len = Math.sqrt(ux*ux + uy*uy) * Math.sqrt(vx*vx + vy*vy);
-
-
 
 				var ang = Math.acos( clamp(dot / len,-1,1) );
 				if ( (ux*vy - uy*vx) < 0)
@@ -79,6 +77,66 @@ var parser = {
 			// r_ = float2((float)rX,(float)rY);
 			// c = float2((float)cx,(float)cy);
 			// angles = float2((float)theta, (float)delta);
+
+			var n1 = theta, n2 = delta;
+
+
+			// E(n)
+			// cx +acosθcosη−bsinθsinη
+			// cy +asinθcosη+bcosθsinη
+			function E(n) {
+				var enx = cx + rx * Math.cos(phi) * Math.cos(n) - ry * Math.sin(phi) * Math.sin(n);
+				var eny = cy + rx * Math.sin(phi) * Math.cos(n) + ry * Math.cos(phi) * Math.sin(n);
+				return {x: enx,y: eny};
+			}
+
+			// E'(n)
+			// −acosθsinη−bsinθcosη
+			// −asinθsinη+bcosθcosη
+			function Ed(n) {
+				var ednx = -1 * rx * Math.cos(phi) * Math.sin(n) - ry * Math.sin(phi) * Math.cos(n);
+				var edny = -1 * rx * Math.sin(phi) * Math.sin(n) + ry * Math.cos(phi) * Math.cos(n);
+				return {x: ednx, y: edny};
+			}
+
+			var n = [];
+			n.push(n1);
+
+			var interval = Math.PI/4;
+
+			while(n[n.length - 1] + interval < n2)
+				n.push(n[n.length - 1] + interval)
+
+			n.push(n2);
+
+			function getCP(n1, n2) {
+				var en1 = E(n1);
+				var en2 = E(n2);
+				var edn1 = Ed(n1);
+				var edn2 = Ed(n2);
+
+				var alpha = Math.sin(n2 - n1) * (Math.sqrt(4 + 3 * Math.pow(Math.tan((n2 - n1)/2), 2)) - 1)/3;
+
+				console.log(en1, en2);
+
+				return {
+					cpx1: en1.x + alpha*edn1.x,
+					cpy1: en1.y + alpha*edn1.y,
+					cpx2: en2.x - alpha*edn2.x,
+					cpy2: en2.y - alpha*edn2.y,
+					en1: en1,
+					en2: en2
+				};
+			}
+
+			var cps = []
+			for(var i = 0; i < n.length - 1; i++) {
+				cps.push(getCP(n[i],n[i+1]));
+			}
+			// cps.push(getCP(n1,n2));
+
+			return cps;
+
 		}
 
 		var command = '', symbol, prevCommand = '';
@@ -144,13 +202,12 @@ var parser = {
 					y1 = getNextPoint() + ry;
 
 					ctx.bezierCurveTo(cpx1, cpy1, cpx2, cpy2, x1, y1);
-
 					x = x1;
 					y = y1;
 					break;
 				case 's':
 				case 'S':
-					if (prevCommand === 's' || prevCommand === 'S' || prevCommand === 'C' || prevCommand === 'c') {
+					if ('sScC'.indexOf(prevCommand) !== -1) {
 						//Reflection of previous control point
 						cpx1 = 2 * (x) - cpx2;
 						cpy1 = 2 * (y) - cpy2;
@@ -188,7 +245,7 @@ var parser = {
 					break;
 				case 't':
 				case 'T':
-					if (prevCommand === 'T' || prevCommand === 't' || prevCommand === 'Q' || prevCommand === 'q') {
+					if ('tTqQ'.indexOf(prevCommand) !== -1) {
 						//Reflection of previous control point
 						cpx1 = 2 * (x) - cpx1;
 						cpy1 = 2 * (y) - cpy1;
@@ -212,15 +269,26 @@ var parser = {
 				case 'A':
 					cpx1 = getNextPoint();
 					cpy1 = getNextPoint();
-					phi = getNextPoint();
+					phi = getNextPoint() * Math.PI / 180;
 					fa = getNextFlag();
 					fs = getNextFlag();
 					x1 = getNextPoint() + rx;
 					y1 = getNextPoint() + ry;
 
-					drawEllipticalArc(cpx1, cpy1, phi, fa, fs, x, y, x1, y1);
-					
-					ctx.x = x1;
+					var cps = generateBezierPoints(cpx1, cpy1, phi, fa, fs, x, y, x1, y1);
+
+
+					for(var i = 0; i < 4; i++) {
+						ctx.bezierCurveTo(cps[i].cpx1, cps[i].cpy1,
+							cps[i].cpx2, cps[i].cpy2,
+							i < 3 ? cps[i].en2.x : x1, i < 3 ? cps[i].en2.y : y1);
+
+						console.log(cps[i].cpx1, cps[i].cpy1,
+							cps[i].cpx2, cps[i].cpy2,
+							i < 3 ? cps[i].en2.x : x1, i < 3 ? cps[i].en2.y : y1);
+					}
+
+					x = x1;
 					y = y1;
 					break;
 				case 'z':
@@ -230,7 +298,7 @@ var parser = {
 					return;
 					break;
 				default:
-					console.error("SVG-CANVAS Error: Unknown command ", command);
+					console.error("SVG-PATH-PARSER Error: Unknown command ", command);
 					ctx.restore();
 					return;
 			}
