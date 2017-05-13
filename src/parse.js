@@ -1,6 +1,7 @@
 
 
 var parser = {
+
 	doMagic: function (ctx, path) {
 		ctx.save();
 		ctx.beginPath();
@@ -78,7 +79,7 @@ var parser = {
 			// c = float2((float)cx,(float)cy);
 			// angles = float2((float)theta, (float)delta);
 
-			var n1 = theta, n2 = delta;
+			var n1 = theta, n2 = theta + delta;
 
 
 			// E(n)
@@ -102,7 +103,7 @@ var parser = {
 			var n = [];
 			n.push(n1);
 
-			var interval = Math.PI/4;
+			var interval = Math.PI/4 * (n1 < n2 ? 1 : -1);
 
 			while(n[n.length - 1] + interval < n2)
 				n.push(n[n.length - 1] + interval)
@@ -277,15 +278,16 @@ var parser = {
 
 					var cps = generateBezierPoints(cpx1, cpy1, phi, fa, fs, x, y, x1, y1);
 
+					var limit = cps.length;
 
-					for(var i = 0; i < 4; i++) {
+					for(var i = 0; i < limit && i < cps.length; i++) {
 						ctx.bezierCurveTo(cps[i].cpx1, cps[i].cpy1,
 							cps[i].cpx2, cps[i].cpy2,
-							i < 3 ? cps[i].en2.x : x1, i < 3 ? cps[i].en2.y : y1);
+							i < limit - 1 ? cps[i].en2.x : x1, i < limit - 1 ? cps[i].en2.y : y1);
 
 						console.log(cps[i].cpx1, cps[i].cpy1,
 							cps[i].cpx2, cps[i].cpy2,
-							i < 3 ? cps[i].en2.x : x1, i < 3 ? cps[i].en2.y : y1);
+							i < limit - 1 ? cps[i].en2.x : x1, i < limit - 1 ? cps[i].en2.y : y1);
 					}
 
 					x = x1;
