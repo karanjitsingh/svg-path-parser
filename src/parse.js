@@ -14,130 +14,115 @@ var parser = {
 		function getNextPoint() { return parseFloat(path.shift()); }
 		function getNextFlag() { return parseInt(path.shift()); }
 
-		function generateBezierPoints(rx, ry, phi, flagA, flagS, x1, y1, x2, y2) {
+		function mag(v) {
+			return Math.sqrt(Math.pow(v[0], 2) + Math.pow(v[1], 2));
+		}
 
-			function clamp(value, min, max) {
-				return Math.min(Math.max(value, min), max)
+		function dot(u, v) {
+			return (u[0]*v[0] + u[1]*v[1]);
+		}
+
+		function ratio(u, v) {
+			return dot(u,v) / (mag(u)*mag(v))
+		}
+
+		function clamp(value, min, max) {
+			return Math.min(Math.max(value, min),max);
+		}
+
+		function angle(u, v) {
+			var sign = 1.0;
+			if ((u[0]*v[1] - u[1]*v[0]) < 0) {
+				sign = -1.0;
+			}
+			return sign * Math.acos(clamp(ratio(u,v), -1, 1));
+		}
+
+		function rotClockwise(v, angle) {
+			var cost = Math.cos(angle);
+			var sint = Math.sin(angle);
+			return [cost*v[0] + sint*v[1], -1 * sint*v[0] + cost*v[1]];
+		}
+
+		function rotCounterClockwise(v, angle) {
+			var cost = Math.cos(angle);
+			var sint = Math.sin(angle);
+			return [cost*v[0] - sint*v[1], sint*v[0] + cost*v[1]];
+		}
+
+		function midPoint(u, v) {
+			return [(u[0] - v[0])/2.0, (u[1] - v[1])/2.0];
+		}
+
+		function meanVec(u, v) {
+			return [(u[0] + v[0])/2.0, (u[1] + v[1])/2.0];
+		}
+
+		function pointMul(u, v) {
+			return [u[0]*v[0], u[1]*v[1]];
+		}
+
+		function scale(c, v) {
+			return [c*v[0], c*v[1]];
+		}
+
+		function sum(u, v) {
+			return [u[0] + v[0], u[1] + v[1]];
+		}
+
+		function ellipseFromEllipticalArc(x1, rx, ry, phi, fA, fS, x2) {
+			// Convert from endpoint to center parametrization, as detailed in:
+			//   http://www.w3.org/TR/SVG/implnote.html#ArcImplementationNotes
+			if (rx == 0 || ry == 0) {
+				ops.push({type: 'lineTo', args: x2});
+				return;
+			}
+			var phi = phi * (Math.PI / 180.0);
+			rx = Math.abs(rx);
+			ry = Math.abs(ry);
+			var xPrime = rotClockwise(midPoint(x1, x2), phi);				// F.6.5.1
+			var xPrime2 = pointMul(xPrime, xPrime);
+			var rx2 = Math.pow(rx, 2);
+			var ry2 = Math.pow(ry, 2);
+	
+			var lambda = Math.sqrt(xPrime2[0]/rx2 + xPrime2[1]/ry2);
+			if (lambda > 1) {
+				rx *= lambda;
+				ry *= lambda;
+				rx2 = Math.pow(rx, 2);
+				ry2 = Math.pow(ry, 2);
 			}
 
-			function svgAngle(ux, uy, vx, vy ) {
-				var dot = ux*vx + uy*vy;
-				var len = Math.sqrt(ux*ux + uy*uy) * Math.sqrt(vx*vx + vy*vy);
-
-				var ang = Math.acos( clamp(dot / len,-1,1) );
-				if ( (ux*vy - uy*vx) < 0)
-					ang = -ang;
-				return ang;
+			var factor = Math.sqrt(Math.abs(rx2*ry2 - rx2*xPrime2[1] - ry2*xPrime2[0]) / (rx2*xPrime2[1] + ry2*xPrime2[0]));
+			
+			if (fA == fS) {
+				factor *= -1.0;
 			}
 
-			var rX = Math.abs(rx);
-			var rY = Math.abs(ry);
+			var cPrime = scale(factor, [rx*xPrime[1]/ry, -ry*xPrime[0]/rx]);						// F.6.5.2
+			var c = sum(rotCounterClockwise(cPrime, phi), meanVec(x1, x2));							// F.6.5.3
+			var x1UnitVector = [(xPrime[0] - cPrime[0])/rx, (xPrime[1] - cPrime[1])/ry];
+			var x2UnitVector = [(-1.0*xPrime[0] - cPrime[0])/rx, (-1.0*xPrime[1] - cPrime[1])/ry];
+			var theta = angle([1, 0], x1UnitVector);												// F.6.5.5
+			var deltaTheta = angle(x1UnitVector, x2UnitVector);										// F.6.5.6
+			var start = theta;
+			var end = theta+deltaTheta;
 
-			var dx2 = (x1 - x2)/2;
-			var dy2 = (y1 - y2)/2;
+			ctx.save();
+			ctx.translate(c[0], c[1]);
+			ctx.rotate(phi);
+			ctx.scale(rx, ry);
+			ctx.arc(0,0,1,start,end, fS ? false : true);
+			ctx.restore();
 
-			var x1p =  Math.cos(phi)*dx2 + Math.sin(phi)*dy2;
-			var y1p = -Math.sin(phi)*dx2 + Math.cos(phi)*dy2;
-
-			var rxs = rX * rX;
-			var rys = rY * rY;
-			var x1ps = x1p * x1p;
-			var y1ps = y1p * y1p;
-
-			var cr = x1ps/rxs + y1ps/rys;
-			if (cr > 1) {
-				var s = Math.sqrt(cr);
-				rX = s * rX;
-				rY = s * rY;
-				rxs = rX * rX;
-				rys = rY * rY;
-			}
-
-			var dq = (rxs * y1ps + rys * x1ps);
-			var pq = (rxs*rys - dq) / dq;
-			var q = Math.sqrt( Math.max(0,pq) );
-			if (flagA === flagS)
-				q = -q;
-			var cxp = q * rX * y1p / rY;
-			var cyp = - q * rY * x1p / rX;
-
-			var cx = Math.cos(phi)*cxp - Math.sin(phi)*cyp + (x1 + x2)/2;
-			var cy = Math.sin(phi)*cxp + Math.cos(phi)*cyp + (y1 + y2)/2;
-
-			var theta = svgAngle( 1,0, (x1p-cxp) / rX, (y1p - cyp)/rY );
-
-			var delta = svgAngle(
-				(x1p - cxp)/rX, (y1p - cyp)/rY,
-				(-x1p - cxp)/rX, (-y1p-cyp)/rY);
-
-			delta = delta - Math.PI * 2 * Math.floor(delta / (Math.PI * 2));
-
-			if (!flagS)
-				delta -= 2 * Math.PI;
-
-			// r_ = float2((float)rX,(float)rY);
-			// c = float2((float)cx,(float)cy);
-			// angles = float2((float)theta, (float)delta);
-
-			var n1 = theta, n2 = theta + delta;
-
-
-			// E(n)
-			// cx +acosθcosη−bsinθsinη
-			// cy +asinθcosη+bcosθsinη
-			function E(n) {
-				var enx = cx + rx * Math.cos(phi) * Math.cos(n) - ry * Math.sin(phi) * Math.sin(n);
-				var eny = cy + rx * Math.sin(phi) * Math.cos(n) + ry * Math.cos(phi) * Math.sin(n);
-				return {x: enx,y: eny};
-			}
-
-			// E'(n)
-			// −acosθsinη−bsinθcosη
-			// −asinθsinη+bcosθcosη
-			function Ed(n) {
-				var ednx = -1 * rx * Math.cos(phi) * Math.sin(n) - ry * Math.sin(phi) * Math.cos(n);
-				var edny = -1 * rx * Math.sin(phi) * Math.sin(n) + ry * Math.cos(phi) * Math.cos(n);
-				return {x: ednx, y: edny};
-			}
-
-			var n = [];
-			n.push(n1);
-
-			var interval = Math.PI/4 * (n1 < n2 ? 1 : -1);
-
-			while(n[n.length - 1] + interval < n2)
-				n.push(n[n.length - 1] + interval)
-
-			n.push(n2);
-
-			function getCP(n1, n2) {
-				var en1 = E(n1);
-				var en2 = E(n2);
-				var edn1 = Ed(n1);
-				var edn2 = Ed(n2);
-
-				var alpha = Math.sin(n2 - n1) * (Math.sqrt(4 + 3 * Math.pow(Math.tan((n2 - n1)/2), 2)) - 1)/3;
-
-				console.log(en1, en2);
-
-				return {
-					cpx1: en1.x + alpha*edn1.x,
-					cpy1: en1.y + alpha*edn1.y,
-					cpx2: en2.x - alpha*edn2.x,
-					cpy2: en2.y - alpha*edn2.y,
-					en1: en1,
-					en2: en2
-				};
-			}
-
-			var cps = []
-			for(var i = 0; i < n.length - 1; i++) {
-				cps.push(getCP(n[i],n[i+1]));
-			}
-			// cps.push(getCP(n1,n2));
-
-			return cps;
-
+			// ops.push(
+			// 	{type: 'save', args: []},
+			// 	{type: 'translate', args: [c[0], c[1]]},
+			// 	{type: 'rotate', args: [phi]},
+			// 	{type: 'scale', args: [rx, ry]},
+			// 	{type: 'arc', args: [0, 0, 1, start, end, 1-fS]},
+			// 	{type: 'restore', args: []}
+			// );
 		}
 
 		var command = '', symbol, prevCommand = '';
@@ -270,25 +255,13 @@ var parser = {
 				case 'A':
 					cpx1 = getNextPoint();
 					cpy1 = getNextPoint();
-					phi = getNextPoint() * Math.PI / 180;
+					phi = getNextPoint();
 					fa = getNextFlag();
 					fs = getNextFlag();
 					x1 = getNextPoint() + rx;
 					y1 = getNextPoint() + ry;
 
-					var cps = generateBezierPoints(cpx1, cpy1, phi, fa, fs, x, y, x1, y1);
-
-					var limit = cps.length;
-
-					for(var i = 0; i < limit && i < cps.length; i++) {
-						ctx.bezierCurveTo(cps[i].cpx1, cps[i].cpy1,
-							cps[i].cpx2, cps[i].cpy2,
-							i < limit - 1 ? cps[i].en2.x : x1, i < limit - 1 ? cps[i].en2.y : y1);
-
-						console.log(cps[i].cpx1, cps[i].cpy1,
-							cps[i].cpx2, cps[i].cpy2,
-							i < limit - 1 ? cps[i].en2.x : x1, i < limit - 1 ? cps[i].en2.y : y1);
-					}
+					ellipseFromEllipticalArc([x, y], cpx1, cpy1, phi, fa, fs, [x1, y1]);
 
 					x = x1;
 					y = y1;
@@ -301,7 +274,6 @@ var parser = {
 					break;
 				default:
 					console.error("SVG-PATH-PARSER Error: Unknown command ", command);
-					ctx.restore();
 					return;
 			}
 		}
