@@ -1,3 +1,5 @@
 *.DS_Store
 *.idea/
-jsconfig.json
+*jsconfig.json
+*npm-debug.log
+out/

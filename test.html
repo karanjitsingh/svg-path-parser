@@ -47,7 +47,7 @@
 			opacity: 0.5;
 		}
 	</style>
-	<script src="src/parse.js"></script>
+	<script src="out/parse.js"></script>
 </head>
 <body>
 <div class="canvas-container">
@@ -57,37 +57,92 @@
 	</svg>
 </div>
 <div spellcheck="false" class="editor-container">
-<textarea id="path-editor">M100,350 l 50,-25
+<!-- <textarea id="path-editor">M100,350 l 50,-25
 a25,25 -30 0,1 50,-25 l 50,-25
 a25,50 -30 0,1 50,-25 l 50,-25
 a25,75 -30 0,1 50,-25 l 50,-25
-a25,100 -30 0,1 50,-25 l 50,-25</textarea></div>
+a25,100 -30 0,1 50,-25 l 50,-25</textarea> -->
+<textarea id="path-editor">M100,350
+a5,25 -30 0,1 50,-25</textarea>
+</div>
 </body>
+<script type="text/javascript" src="./out/parse.js"></script>
 <script>
 
-	var editor = document.getElementById('path-editor');
-	var canvas = document.getElementById("canvas");
-	var ctx = canvas.getContext("2d");
-	var path = document.getElementById('path');
+var editor = document.getElementById('path-editor');
+var canvas = document.getElementById("canvas");
+var ctx = canvas.getContext("2d");
+var path = document.getElementById('path');
+var parser;
+var d;
 
-	function parse() {
-		var d = editor.value;
-		ctx.clearRect(0,0,canvas.width,canvas.height);
-		path.setAttribute('d', d);
-		parser.doMagic(ctx, d);
-		ctx.stroke();
-	}
 
-	canvas.width = document.body.clientWidth;
-	canvas.height = document.body.clientHeight;
-	ctx.strokeWidth = 2;
-	ctx.strokeStyle = "#000000";
+function parse() {
+	d = editor.value;
+	ctx.clearRect(0,0,canvas.width,canvas.height);
+	path.setAttribute('d', d);
+	
+	parser = new SVGParser(d);
+	// parser.doMagic(ctx, d);
+	// ctx.stroke();
+}
 
-	editor.onkeyup = function () {
-		parse();
-	}
+canvas.width = document.body.clientWidth;
+canvas.height = document.body.clientHeight;
+ctx.strokeWidth = 2;
+ctx.strokeStyle = "#000000";
 
+editor.onkeyup = function () {
 	parse();
+}
+
+parse();
+
+ParsePath2D(d);
+
+function rotate(cx, cy, p, theta) {
+	var pPrime = {x:0, y:0};
+	pPrime.x = (p.x - cx) * Math.cos(theta) - (p.y - cy) * Math.sin(theta) + cx;
+	pPrime.y = (p.x - cx) * Math.sin(theta) + (p.y - cy) * Math.cos(theta) + cy;
+	return pPrime;
+}
+
+function ellipticalArc(x, y, w, h, sa, ea) {
+	this.x = x 
+	this.y = y
+	this.w = w
+	this.h = h
+
+	this.sa = sa;
+	this.ea = ea;
+	this.theta = this.ea - this.sa;
+
+	if (this.theta < 0)
+		this.theta = (2 * Math.PI + this.theta);
+
+	this.length = Math.atan(this.w / this.h * Math.tan(this.theta));
+
+	this.length = ( 1.111 * ( Math.sqrt(
+		Math.pow(this.w / 2 * (Math.cos(this.sa) - Math.cos(this.ea) ), 2) +
+		Math.pow(this.h / 2 * (Math.sin(this.sa) - Math.sin(this.ea) ), 2)
+	)));
+
+	this.getPoint = function (n) {
+		return {
+			x: this.x + this.w / 2 * Math.cos(this.sa + n * this.theta),
+			y: this.y + this.h / 2 * Math.sin(this.sa + n * this.theta)
+		};
+	};
+
+	this.plot = (n, angle) => {
+		ctx.fillStyle = "#000000";
+		var point = angle ? rotate(this.x, this.y, this.getPoint(n), angle / 180 * Math.PI) : this.getPoint(n);
+		ctx.fillRect(point.x, point.y, 1, 1);
+	};
+}
+
+
+
 
 </script>
 </html>
