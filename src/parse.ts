@@ -154,8 +154,8 @@ class SVGPath {
 				args.unshift(cp1.x);
 				
 
-				pos.x = args[2];
-				pos.y = args[3];
+				pos.x = args[4];
+				pos.y = args[5];
 				
 				return [<CanvasPathElement> {
 					f: CanvasCommand.BezierCurve,
@@ -199,8 +199,8 @@ class SVGPath {
 				args.unshift(cp1.y);
 				args.unshift(cp1.x);
 
-				pos.x = args[0];
-				pos.y = args[1];
+				pos.x = args[2];
+				pos.y = args[3];
 				
 				return [<CanvasPathElement> {
 					f: CanvasCommand.QuadraticCurve,
