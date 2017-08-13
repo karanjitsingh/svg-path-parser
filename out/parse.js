@@ -53,6 +53,10 @@ var SVGPath = (function () {
             x: 0,
             y: 0
         };
+        var drawOrigin = {
+            x: 0,
+            y: 0
+        };
         while (d.length > 0) {
             matchPattern(RegexPatterns.WS);
             if (matchPattern(RegexPatterns.Commands)) {
@@ -86,7 +90,11 @@ var SVGPath = (function () {
                     _args = pathList[pathList.length - 1].args;
                 }
                 commandList.push(svgCmd);
-                pathList.push.apply(pathList, signature.toCanvas(ctxPos, relative, svgCmd.args, _args));
+                pathList.push.apply(pathList, signature.toCanvas(ctxPos, relative, cmd.toUpperCase() == "Z" ? [drawOrigin.x, drawOrigin.y] : svgCmd.args, _args));
+                if (cmd.toUpperCase() == "M") {
+                    drawOrigin.x = pathList[pathList.length - 1].args[0];
+                    drawOrigin.y = pathList[pathList.length - 1].args[1];
+                }
             }
             else if (d.length > 0) {
                 this.parseError = true;
@@ -94,7 +102,6 @@ var SVGPath = (function () {
                 break;
             }
         }
-        console.log(p);
         return pathList;
     };
     SVGPath.parseEllipticalArc = function (x1, r, phi, fA, fS, x2) {
@@ -351,9 +358,12 @@ var SVGPath = (function () {
         // Zz
         "Z": {
             toCanvas: function (pos, relative, args) {
-                var args = args.slice();
-                var canvasCommand = CanvasCommand.ClosePath;
-                return null;
+                pos.x = args[0];
+                pos.y = args[1];
+                return [{
+                        f: CanvasCommand.Line,
+                        args: args
+                    }];
             },
             regexPattern: []
         },

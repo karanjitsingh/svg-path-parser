@@ -240,10 +240,13 @@ class SVGPath {
 		// Zz
 		"Z": <CommandSignature>{
 			toCanvas: (pos: Point, relative: boolean, args: Array<number>) => {
-				var args = args.slice();
-				
-				var canvasCommand = CanvasCommand.ClosePath;
-				return null;
+
+				pos.x = args[0];
+				pos.y = args[1];				
+				return [<CanvasPathElement>{
+					f: CanvasCommand.Line,
+					args: args
+				}];
 			},
 			regexPattern: []
 		},
@@ -288,6 +291,10 @@ class SVGPath {
 			x: 0,
 			y: 0
 		}
+		var drawOrigin: Point = {
+			x:0,
+			y:0
+		}
 
 		while(d.length > 0) {
 			matchPattern(RegexPatterns.WS);
@@ -330,7 +337,12 @@ class SVGPath {
 				}
 
 				commandList.push(svgCmd);
-				pathList.push.apply(pathList,signature.toCanvas(ctxPos,relative,svgCmd.args, _args));
+				pathList.push.apply(pathList,signature.toCanvas(ctxPos,relative, cmd.toUpperCase() == "Z" ? [drawOrigin.x, drawOrigin.y] : svgCmd.args, _args));
+
+				if(cmd.toUpperCase() == "M") {
+					drawOrigin.x = pathList[pathList.length-1].args[0];
+					drawOrigin.y = pathList[pathList.length-1].args[1];
+				}
 			}
 			else if(d.length > 0) {
 				this.parseError = true;
@@ -340,7 +352,6 @@ class SVGPath {
 			
 		}
 		
-		console.log(p);
 		return pathList;
 	}
 	
