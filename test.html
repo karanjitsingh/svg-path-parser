@@ -47,13 +47,12 @@
 			opacity: 0.5;
 		}
 	</style>
-	<script src="out/parse.js"></script>
 </head>
 <body>
 <div class="canvas-container">
 	<canvas id="canvas"></canvas>
 	<svg>
-		<path fill="none" id="path" stroke="red" stroke-width="2"></path>
+		<path fill="none" id="path" stroke="red" stroke-width="1" transform="scale(10)"></path>
 	</svg>
 </div>
 <div spellcheck="false" class="editor-container">
@@ -62,10 +61,11 @@ a25,25 -30 0,1 50,-25 l 50,-25
 a25,50 -30 0,1 50,-25 l 50,-25
 a25,75 -30 0,1 50,-25 l 50,-25
 a25,100 -30 0,1 50,-25 l 50,-25</textarea> -->
-<textarea id="path-editor">M100,350
-a5,25 -30 0,1 50,-25</textarea>
+<textarea id="path-editor"> M 10 50 h -2 c -0.552 0 -1 -0.448 -1 -1 v -13 c 0 -0.552 0.448 -1 1 -1 h 13 c 0.552 0 1 0.448 1 1 v 2 h 4.667 c 1.117 0 1.6 0.576 1.936 1.107 c 0.594 0.94 1.536 2.432 2.109 3.378 c 0.188 0.312 0.288 0.67 0.288 1.035 v 4.48 c 0 1.089 -0.743 2 -2 2 h -1 c 0 1.656 -1.344 3 -3 3 s -3 -1.344 -3 -3
+</textarea>
 </div>
 </body>
+<script type="text/javascript" src="./out/parse.1.js"></script>
 <script type="text/javascript" src="./out/parse.js"></script>
 <script>
 
@@ -82,7 +82,21 @@ function parse() {
 	ctx.clearRect(0,0,canvas.width,canvas.height);
 	path.setAttribute('d', d);
 	
-	parser = new SVGParser(d);
+
+	ctx.scale(10,10);
+	
+	ctx.strokeStyle = "#00FF00";
+	ctx.lineWidth = 1;
+	p.doMagic(ctx, d);
+	ctx.stroke();
+	ctx.closePath();
+	
+	ctx.beginPath();
+	parser = new SVGPath(d);
+	parser.draw(ctx);
+	ctx.lineWidth = 1;
+	ctx.strokeStyle = "#0000FF";
+	ctx.stroke();
 	// parser.doMagic(ctx, d);
 	// ctx.stroke();
 }
@@ -97,8 +111,6 @@ editor.onkeyup = function () {
 }
 
 parse();
-
-ParsePath2D(d);
 
 function rotate(cx, cy, p, theta) {
 	var pPrime = {x:0, y:0};

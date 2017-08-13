@@ -13,7 +13,7 @@ enum CanvasCommand {
 	ClosePath = "closePath"
 }
 
-interface PathElement {
+interface CanvasPathElement {
 	f: CanvasCommand,
 	args: Array<number>
 }
@@ -25,227 +25,432 @@ interface Point {
 
 interface PathCommand {
 	command: string,
-	regex: string
+	args: Array<number>
 }
 
-function ParsePath2D(paths: string) {
+interface CommandSignature {
+	toCanvas: (pos:Point, relative: boolean, args: Array<number>, _args?: Array<number>) => Array<CanvasPathElement>,
+	canvasCommand: CanvasCommand
+	regexPattern: Array<RegexPatterns>
+}
 
-	console.log(paths);
+enum RegexPatterns {
+	Num = 0,
+	Flag,
+	WS,
+	Commands,
+}
 
-	const enum RegexPatterns {
-		Num = 0,
-		Flag,
-		WS,
-		Commands,
+class SVGPath {
+	
+	private static Patterns: string[] =  ["(-?(?:[0-9]*)?(?:[.])?[0-9]+)", "([01])", "(?:[,]|[\n \t]*)?", "([MmLlHhVvCcSsQqTtAaZz])"];
+	
+	private static relToAbs(rel:Point, args: Array<number>) {
+		for(var i=0;i<args.length;i++)
+			args[i] += i%2==0?rel.x:rel.y;
 	}
 
-	var Patterns = ["(-?(?:[0-9]*)?(?:[.])?[0-9]+)", "([01])", "(?:[,]|[\n \t]*)?", "([MmLlHhVvCcSsQqTtAa])"];
-
-	var regStrings = {
+	private static Signatures:{ [id: string] : CommandSignature; } = {
 		// Mm (x y)+
-		"M": [RegexPatterns.Num, RegexPatterns.Num],
+		"M": <CommandSignature>{
+			toCanvas: (pos: Point, relative: boolean, args: Array<number>) => {
+				var args = args.slice();
+				if(relative) SVGPath.relToAbs(pos, args);
 
+				pos.x = args[0];
+				pos.y = args[1];
+				
+				return [<CanvasPathElement> {
+					f: CanvasCommand.Move,
+					args: args
+				}]
+			},
+			regexPattern: [RegexPatterns.Num, RegexPatterns.Num]
+		},
+		
 		// Ll (x y)+
-		"L": [RegexPatterns.Num, RegexPatterns.Num],
+		"L": <CommandSignature>{
+			toCanvas: (pos: Point, relative: boolean, args: Array<number>) => {
+				var args = args.slice();
+				if(relative) SVGPath.relToAbs(pos, args);
 
+				pos.x = args[0];
+				pos.y = args[1];
+				
+				return [<CanvasPathElement> {
+					f: CanvasCommand.Line,
+					args: args
+				}]
+			},
+			regexPattern: [RegexPatterns.Num, RegexPatterns.Num]
+		},
 		// Hh x+
-		"H": [RegexPatterns.Num],
+		"H": <CommandSignature>{
+			toCanvas: (pos: Point, relative: boolean, args: Array<number>) => {
+				var args = args.slice();
+				if(relative) args[0] += pos.x;
+				args.push(pos.y);
 
+				pos.x = args[0];
+				pos.y = pos.y;
+				
+				return [<CanvasPathElement> {
+					f: CanvasCommand.Line,
+					args: args
+				}]
+			},
+			regexPattern: [RegexPatterns.Num],
+		},
 		// Vv y+
-		"V": [RegexPatterns.Num],
+		"V": <CommandSignature>{
+			toCanvas: (pos: Point, relative: boolean, args: Array<number>) => {
+				var args = args.slice();
+				args.unshift(pos.x);
+				if(relative) args[1] += pos.y
 
+				pos.x = pos.x;
+				pos.y = args[1];
+				
+				return [<CanvasPathElement> {
+					f: CanvasCommand.Line,
+					args: args
+				}]
+			},
+			regexPattern: [RegexPatterns.Num],
+		},
 		// Cc (x1 y1 x2 y2 x y)+
-		"C": [RegexPatterns.Num, RegexPatterns.Num, RegexPatterns.Num, RegexPatterns.Num, RegexPatterns.Num, RegexPatterns.Num],
+		"C": <CommandSignature>{
+			toCanvas: (pos: Point, relative: boolean, args: Array<number>) => {
+				var args = args.slice();
+				if(relative) SVGPath.relToAbs(pos, args);
 
+				pos.x = args[4];
+				pos.y = args[5];
+				
+				return [<CanvasPathElement> {
+					f: CanvasCommand.BezierCurve,
+					args: args
+				}]
+			},
+			regexPattern: [RegexPatterns.Num, RegexPatterns.Num, RegexPatterns.Num, RegexPatterns.Num, RegexPatterns.Num, RegexPatterns.Num],
+		},
 		// Ss (x2 y2 x y)+
-		"S": [RegexPatterns.Num, RegexPatterns.Num, RegexPatterns.Num, RegexPatterns.Num],
+		"S": <CommandSignature>{
+			toCanvas: (pos: Point, relative: boolean, args: Array<number>, _args: Array<number>) => {
+				var args = args.slice();
+				if(relative) SVGPath.relToAbs(pos, args);
 
+				var cp1:Point = {
+					x: pos.x,
+					y: pos.y
+				}
+
+				if(_args) {
+					cp1.x = 2 * pos.x - _args[2];
+					cp1.y = 2 * pos.y - _args[3];
+				}
+
+				args.unshift(cp1.y);
+				args.unshift(cp1.x);
+				
+
+				pos.x = args[2];
+				pos.y = args[3];
+				
+				return [<CanvasPathElement> {
+					f: CanvasCommand.BezierCurve,
+					args: args
+				}]
+			},
+			regexPattern: [RegexPatterns.Num, RegexPatterns.Num, RegexPatterns.Num, RegexPatterns.Num],
+		},
 		// Qq (x1 y1 x y)+
-		"Q": [RegexPatterns.Num, RegexPatterns.Num, RegexPatterns.Num, RegexPatterns.Num],
+		"Q": <CommandSignature>{
+			toCanvas: (pos: Point, relative: boolean, args: Array<number>) => {
+				var args = args.slice();
+				if(relative) SVGPath.relToAbs(pos, args);
 
+				pos.x = args[2];
+				pos.y = args[3];
+				
+				return [<CanvasPathElement> {
+					f: CanvasCommand.QuadraticCurve,
+					args: args
+				}]
+			},
+			regexPattern: [RegexPatterns.Num, RegexPatterns.Num, RegexPatterns.Num, RegexPatterns.Num],
+		},
 		// Tt (x y)+
-		"T": [RegexPatterns.Num, RegexPatterns.Num],
+		"T": <CommandSignature>{
+			toCanvas: (pos: Point, relative: boolean, args: Array<number>, _args: Array<number>) => {
+				var args = args.slice();
+				if(relative) SVGPath.relToAbs(pos, args);
+				
+				var cp1:Point = {
+					x: pos.x,
+					y: pos.y
+				}
 
-		// Aa (rx ry x-axis-rotation large-arc-flag sweep-flag x y)+
-		"A": [RegexPatterns.Num, RegexPatterns.Num, RegexPatterns.Num, RegexPatterns.Flag, RegexPatterns.Flag, RegexPatterns.Num, RegexPatterns.Num],
+				if(_args) {
+					cp1.x = 2 * pos.x - _args[0];
+					cp1.y = 2 * pos.y - _args[1];
+				}
+
+				args.unshift(cp1.y);
+				args.unshift(cp1.x);
+
+				pos.x = args[0];
+				pos.y = args[1];
+				
+				return [<CanvasPathElement> {
+					f: CanvasCommand.QuadraticCurve,
+					args: args
+				}]
+			},
+			regexPattern: [RegexPatterns.Num, RegexPatterns.Num],
+		},
+		// Aa (r.x r.y x-axis-rotation large-arc-flag sweep-flag x y)+
+		"A": <CommandSignature>{
+			toCanvas: (pos: Point, relative: boolean, args: Array<number>) => {
+				var args = args.slice();
+				if(relative) {
+					args[5] += pos.x;
+					args[6] += pos.y;
+				}
+
+				var pathElements: Array<CanvasPathElement> = SVGPath.parseEllipticalArc(
+					pos,
+					{x: args[0], y:args[1]},
+					args[2],
+					args[3],
+					args[4],
+					{
+						x:args[5],
+						y:args[6]
+					}
+				);
+
+				pos.x = args[5];
+				pos.y = args[6];
+				
+				return pathElements;
+			},
+			regexPattern: [RegexPatterns.Num, RegexPatterns.Num, RegexPatterns.Num, RegexPatterns.Flag, RegexPatterns.Flag, RegexPatterns.Num, RegexPatterns.Num],
+		},
+		// Zz
+		"Z": <CommandSignature>{
+			toCanvas: (pos: Point, relative: boolean, args: Array<number>) => {
+				var args = args.slice();
+				
+				var canvasCommand = CanvasCommand.ClosePath;
+				return null;
+			},
+			regexPattern: []
+		},
 	};
-
-	// var getCommandRegex = function(command) {
-	// 	var regex = "^" + Patterns.ws + "([" + command + command.toLowerCase() + "])" + Patterns.ws + regStrings[command];
-	// 	console.log(regex);
-	// 	return new RegExp(regex, "m");
-	// }
-
-	// var i;
-	// for(i in regStrings) {
-	// 	var regex = getCommandRegex(i);
-	// 	console.log(paths.match(regex))
-	// }
 	
+	public paths: Array<CanvasPathElement>;
+	public parseError: boolean;
 	
-}
-
-class SVGParser {
-	
-	private paths: Array<PathElement> = [];
-
-	public SVGParser(path2D: string) {
-		this.ParsePath2D(path2D);
+	constructor(d: string) {
+		this.paths = [];
+		this.parseError = false;
+		this.paths = this.ParsePath2D(d);
 	}
-
-	private ParsePath2D(paths: string) {
-
-		console.log(paths);
-
-		var Patterns = {
-			num: "(-?[[0-9]*.]?[0-9]+)",
-			flag: "([01])",
-			ws: "[[,]|[[\\n \\t]*]]?",
-		};
-
-
-		var regStrings = {
-			// Mm (x y)+
-			"M": Patterns.num + Patterns.ws + Patterns.num,
-
-			// Ll (x y)+
-			"L": Patterns.num + Patterns.ws + Patterns.num,
-
-			// Hh x+
-			"H": Patterns.num,
-
-			// Vv y+
-			"V": Patterns.num,
-
-			// Cc (x1 y1 x2 y2 x y)+
-			"C": Patterns.num + Patterns.ws + Patterns.num + Patterns.ws + Patterns.num ,
-
-			// Ss (x2 y2 x y)+
-			"S": Patterns.num + Patterns.ws + Patterns.num + Patterns.ws + Patterns.num,
+	
+	private ParsePath2D(d: string): Array<CanvasPathElement> {
+		
+		var match: RegExpMatchArray;
+		var commandList: Array<PathCommand> = [];
+		var pathList: Array<CanvasPathElement> = []
+		
+		var matchPattern = function (p: RegexPatterns, flags?:string) {
+			var m;
 			
-			// Qq (x1 y1 x y)+
-			"Q": Patterns.num + Patterns.ws + Patterns.num + Patterns.ws + Patterns.num,
-
-			// Tt (x y)+
-			"T": Patterns.num + Patterns.ws + Patterns.num,
-
-			// Aa (rx ry x-axis-rotation large-arc-flag sweep-flag x y)+
-			"A": Patterns.num + Patterns.ws + Patterns.num + Patterns.ws + Patterns.num + Patterns.ws + Patterns.flag + Patterns.ws + Patterns.flag + Patterns.ws + Patterns.num + Patterns.ws + Patterns.num
+			if((m = d.match(new RegExp("^" + SVGPath.Patterns[p], flags))) !== null) {
+				d = d.substr(m[0].length);
+				parserPos += m[0].length;
+				match = m;
+			}
+			else if((m = d.match(new RegExp("^" + SVGPath.Patterns[RegexPatterns.Num], flags))) !== null) {
+				match = [commandList[commandList.length-1].command];
+			}
+			else 
+				match = null;
+				
+			return match !== null;
 		};
 
-		
+		var p = "";
+		var parserPos = 0;
 
+		var ctxPos: Point = {
+			x: 0,
+			y: 0
+		}
 
+		while(d.length > 0) {
+			matchPattern(RegexPatterns.WS);
+			
+			if(matchPattern(RegexPatterns.Commands)) {
+				var cmd = match[0];
+				var relative = cmd.toLowerCase() === cmd;
+				var signature = SVGPath.Signatures[cmd.toUpperCase()];
+				var pattern = signature.regexPattern;
+				var _args: Array<number> = null;
+
+				p += " " + cmd;
+
+				var svgCmd: PathCommand = {
+					command: match[0],
+					args: [],
+				}
+
+				var canvasCmd: CanvasPathElement = {
+					f: signature.canvasCommand,
+					args: []
+				}
+
+				for(var i=0;i<pattern.length;i++) {
+					matchPattern(RegexPatterns.WS);
+					if(matchPattern(pattern[i])){
+						svgCmd.args.push(pattern[i] === RegexPatterns.Num ? parseFloat(match[0]) : parseInt(match[0]));
+					}
+					else {
+						this.parseError = true;
+						console.error("Error parsing svg path at " + parserPos);
+						return pathList;
+					}
+				}
+
+				p += " " + svgCmd.args.join(" ");
+
+				if(pathList.length > 1 && ((cmd.toUpperCase() == "S" && "cCsS".indexOf(commandList[commandList.length-1].command) !== -1) || (cmd.toUpperCase() == "T" && "qQtT".indexOf(commandList[commandList.length-1].command) !== -1))) {
+					_args = pathList[pathList.length-1].args;
+				}
+
+				commandList.push(svgCmd);
+				pathList.push.apply(pathList,signature.toCanvas(ctxPos,relative,svgCmd.args, _args));
+			}
+			else if(d.length > 0) {
+				this.parseError = true;
+				console.error("Error parsing svg path at " + parserPos);
+				break;
+			}
+			
+		}
 		
+		console.log(p);
+		return pathList;
 	}
-
-	private parseEllipticalArc(x1: Point, rx: number, ry: number, phi: number, fA: number, fS: number, x2: Point) {
-
-		function mag(v) {
-			return Math.sqrt(Math.pow(v[0], 2) + Math.pow(v[1], 2));
+	
+	private static parseEllipticalArc(x1: Point, r:Point , phi: number, fA: number, fS: number, x2: Point): Array<CanvasPathElement> {
+		
+		function mag(v: Point) {
+			return Math.sqrt(Math.pow(v.x, 2) + Math.pow(v.y, 2));
 		}
-
-		function dot(u, v) {
-			return (u[0]*v[0] + u[1]*v[1]);
+		
+		function dot(u: Point, v: Point) {
+			return (u.x*v.x + u.y*v.y);
 		}
-
-		function ratio(u, v) {
+		
+		function ratio(u: Point, v: Point) {
 			return dot(u,v) / (mag(u)*mag(v))
 		}
-
+		
 		function clamp(value, min, max) {
 			return Math.min(Math.max(value, min),max);
 		}
-
-		function angle(u, v) {
+		
+		function angle(u: Point, v: Point) {
 			var sign = 1.0;
-			if ((u[0]*v[1] - u[1]*v[0]) < 0) {
+			if ((u.x*v.y - u.y*v.x) < 0) {
 				sign = -1.0;
 			}
 			return sign * Math.acos(clamp(ratio(u,v), -1, 1));
 		}
-
-		function rotClockwise(v, angle) {
+		
+		function rotClockwise(v: Point, angle): Point {
 			var cost = Math.cos(angle);
 			var sint = Math.sin(angle);
-			return [cost*v[0] + sint*v[1], -1 * sint*v[0] + cost*v[1]];
+			return {x: cost*v.x + sint*v.y, y:-1 * sint*v.x + cost*v.y};
 		}
-
-		function rotCounterClockwise(v, angle) {
+		
+		function rotCounterClockwise(v: Point, angle): Point {
 			var cost = Math.cos(angle);
 			var sint = Math.sin(angle);
-			return [cost*v[0] - sint*v[1], sint*v[0] + cost*v[1]];
+			return {x:cost*v.x - sint*v.y, y:sint*v.x + cost*v.y};
 		}
-
-		function midPoint(u, v) {
-			return [(u[0] - v[0])/2.0, (u[1] - v[1])/2.0];
+		
+		function midPoint(u: Point, v: Point): Point {
+			return {x:(u.x - v.x)/2.0, y:(u.y - v.y)/2.0};
 		}
-
-		function meanVec(u, v) {
-			return [(u[0] + v[0])/2.0, (u[1] + v[1])/2.0];
+		
+		function meanVec(u: Point, v: Point): Point {
+			return {x:(u.x + v.x)/2.0, y:(u.y + v.y)/2.0};
 		}
-
-		function pointMul(u, v) {
-			return [u[0]*v[0], u[1]*v[1]];
+		
+		function pointMul(u: Point, v: Point): Point {
+			return {x:u.x*v.x, y:u.y*v.y};
 		}
-
-		function scale(c, v) {
-			return [c*v[0], c*v[1]];
+		
+		function scale(c, v: Point): Point {
+			return {x:c*v.x, y:c*v.y};
 		}
-
-		function sum(u, v) {
-			return [u[0] + v[0], u[1] + v[1]];
+		
+		function sum(u: Point, v: Point): Point {
+			return {x:u.x + v.x, y: u.y + v.y};
 		}
-
+		
 		// Convert from endpoint to center parametrization, as detailed in:
 		//   http://www.w3.org/TR/SVG/implnote.html#ArcImplementationNotes
-		if (rx == 0 || ry == 0) {
-			this.paths.push({f: CanvasCommand.Line, args: [x2.x, x2.y]});
-			return;
+		if (r.x == 0 || r.y == 0) {
+			return[{f: CanvasCommand.Line, args: [x2.x, x2.y]}];
 		}
 		var phi = phi * (Math.PI / 180.0);
-		rx = Math.abs(rx);
-		ry = Math.abs(ry);
+		r.x = Math.abs(r.x);
+		r.y = Math.abs(r.y);
 		var xPrime = rotClockwise(midPoint(x1, x2), phi);				// F.6.5.1
 		var xPrime2 = pointMul(xPrime, xPrime);
-		var rx2 = Math.pow(rx, 2);
-		var ry2 = Math.pow(ry, 2);
-
-		var lambda = Math.sqrt(xPrime2[0]/rx2 + xPrime2[1]/ry2);
+		var r2 = {x:Math.pow(r.x, 2), y: Math.pow(r.y, 2)};
+		
+		var lambda = Math.sqrt(xPrime2.x/r2.x + xPrime2.y/r2.y);
 		if (lambda > 1) {
-			rx *= lambda;
-			ry *= lambda;
-			rx2 = Math.pow(rx, 2);
-			ry2 = Math.pow(ry, 2);
+			r.x *= lambda;
+			r.y *= lambda;
+			r2.x = Math.pow(r.x, 2);
+			r2.y = Math.pow(r.y, 2);
 		}
-
-		var factor = Math.sqrt(Math.abs(rx2*ry2 - rx2*xPrime2[1] - ry2*xPrime2[0]) / (rx2*xPrime2[1] + ry2*xPrime2[0]));
+		
+		var factor = Math.sqrt(Math.abs(r2.x*r2.y - r2.x*xPrime2.y - r2.y*xPrime2.x) / (r2.x*xPrime2.y + r2.y*xPrime2.x));
 		
 		if (fA == fS) {
 			factor *= -1.0;
 		}
-
-		var cPrime = scale(factor, [rx*xPrime[1]/ry, -ry*xPrime[0]/rx]);						// F.6.5.2
-		var c = sum(rotCounterClockwise(cPrime, phi), meanVec(x1, x2));							// F.6.5.3
-		var x1UnitVector = [(xPrime[0] - cPrime[0])/rx, (xPrime[1] - cPrime[1])/ry];
-		var x2UnitVector = [(-1.0*xPrime[0] - cPrime[0])/rx, (-1.0*xPrime[1] - cPrime[1])/ry];
-		var theta = angle([1, 0], x1UnitVector);												// F.6.5.5
-		var deltaTheta = angle(x1UnitVector, x2UnitVector);										// F.6.5.6
+		
+		var cPrime = scale(factor, {x: r.x*xPrime.y/r.y, y: -r.y*xPrime.x/r.x});					// F.6.5.2
+		var c = sum(rotCounterClockwise(cPrime, phi), meanVec(x1, x2));								// F.6.5.3
+		var x1UnitVector = {x: (xPrime.x - cPrime.x)/r.x, y:(xPrime.y - cPrime.y)/r.y};
+		var x2UnitVector = {x:(-1.0*xPrime.x - cPrime.x)/r.x, y:(-1.0*xPrime.y - cPrime.y)/r.y};
+		var theta = angle({x:1, y:0}, x1UnitVector);												// F.6.5.5
+		var deltaTheta = angle(x1UnitVector, x2UnitVector);											// F.6.5.6
 		var start = theta;
 		var end = theta+deltaTheta;
-
-		this.paths.push(
+		
+		return [
 			{f: CanvasCommand.Save, args: []},
-			{f: CanvasCommand.Translate, args: [c[0], c[1]]},
+			{f: CanvasCommand.Translate, args: [c.x, c.y]},
 			{f: CanvasCommand.Rotate, args: [phi]},
-			{f: CanvasCommand.Scale, args: [rx, ry]},
+			{f: CanvasCommand.Scale, args: [r.x, r.y]},
 			{f: CanvasCommand.EllipticalArc, args: [0, 0, 1, start, end, 1-fS]},
 			{f: CanvasCommand.Restore, args: []}
-		);
+		];
 	}
-
+	
 	public draw(ctx: CanvasRenderingContext2D) {
-
+		for(var i =0;i<this.paths.length; i++) {
+			ctx[this.paths[i].f].apply(ctx,this.paths[i].args);
+		}
 	}
-
+	
 }
