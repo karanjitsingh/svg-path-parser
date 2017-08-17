@@ -2,6 +2,7 @@
     "compilerOptions": {
         "target": "ES5",
         "outDir": "out",
+        "outFile": "out/parse.js",
         "rootDir": "src",
         "sourceMap": true,
         "allowJs": false
