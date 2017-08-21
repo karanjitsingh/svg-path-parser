@@ -15,7 +15,8 @@ enum CanvasCommand {
 
 interface CanvasPathElement {
 	f: CanvasCommand,
-	args: Array<number>
+	args: Array<number>,
+	from: Point
 }
 
 interface Point {
@@ -57,12 +58,18 @@ class SVGPath {
 				var args = args.slice();
 				if(relative) SVGPath.relToAbs(pos, args);
 
+				var from = {
+					x: pos.x,
+					y: pos.y
+				};
+
 				pos.x = args[0];
 				pos.y = args[1];
 				
 				return [<CanvasPathElement> {
 					f: CanvasCommand.Move,
-					args: args
+					args: args,
+					from: from
 				}]
 			},
 			regexPattern: [RegexPatterns.Num, RegexPatterns.Num]
@@ -74,12 +81,18 @@ class SVGPath {
 				var args = args.slice();
 				if(relative) SVGPath.relToAbs(pos, args);
 
+				var from = {
+					x: pos.x,
+					y: pos.y
+				};
+
 				pos.x = args[0];
 				pos.y = args[1];
 				
 				return [<CanvasPathElement> {
 					f: CanvasCommand.Line,
-					args: args
+					args: args,
+					from: from
 				}]
 			},
 			regexPattern: [RegexPatterns.Num, RegexPatterns.Num]
@@ -91,12 +104,18 @@ class SVGPath {
 				if(relative) args[0] += pos.x;
 				args.push(pos.y);
 
+				var from = {
+					x: pos.x,
+					y: pos.y
+				};
+
 				pos.x = args[0];
 				pos.y = pos.y;
 				
 				return [<CanvasPathElement> {
 					f: CanvasCommand.Line,
-					args: args
+					args: args,
+					from: from
 				}]
 			},
 			regexPattern: [RegexPatterns.Num],
@@ -108,12 +127,18 @@ class SVGPath {
 				args.unshift(pos.x);
 				if(relative) args[1] += pos.y
 
+				var from = {
+					x: pos.x,
+					y: pos.y
+				};
+
 				pos.x = pos.x;
 				pos.y = args[1];
 				
 				return [<CanvasPathElement> {
 					f: CanvasCommand.Line,
-					args: args
+					args: args,
+					from: from
 				}]
 			},
 			regexPattern: [RegexPatterns.Num],
@@ -124,12 +149,18 @@ class SVGPath {
 				var args = args.slice();
 				if(relative) SVGPath.relToAbs(pos, args);
 
+				var from = {
+					x: pos.x,
+					y: pos.y
+				};
+
 				pos.x = args[4];
 				pos.y = args[5];
 				
 				return [<CanvasPathElement> {
 					f: CanvasCommand.BezierCurve,
-					args: args
+					args: args,
+					from: from
 				}]
 			},
 			regexPattern: [RegexPatterns.Num, RegexPatterns.Num, RegexPatterns.Num, RegexPatterns.Num, RegexPatterns.Num, RegexPatterns.Num],
@@ -153,13 +184,18 @@ class SVGPath {
 				args.unshift(cp1.y);
 				args.unshift(cp1.x);
 				
+				var from = {
+					x: pos.x,
+					y: pos.y
+				};
 
 				pos.x = args[4];
 				pos.y = args[5];
 				
 				return [<CanvasPathElement> {
 					f: CanvasCommand.BezierCurve,
-					args: args
+					args: args,
+					from: from
 				}]
 			},
 			regexPattern: [RegexPatterns.Num, RegexPatterns.Num, RegexPatterns.Num, RegexPatterns.Num],
@@ -170,12 +206,18 @@ class SVGPath {
 				var args = args.slice();
 				if(relative) SVGPath.relToAbs(pos, args);
 
+				var from = {
+					x: pos.x,
+					y: pos.y
+				};
+
 				pos.x = args[2];
 				pos.y = args[3];
 				
 				return [<CanvasPathElement> {
 					f: CanvasCommand.QuadraticCurve,
-					args: args
+					args: args,
+					from: from
 				}]
 			},
 			regexPattern: [RegexPatterns.Num, RegexPatterns.Num, RegexPatterns.Num, RegexPatterns.Num],
@@ -199,12 +241,18 @@ class SVGPath {
 				args.unshift(cp1.y);
 				args.unshift(cp1.x);
 
+				var from = {
+					x: pos.x,
+					y: pos.y
+				};
+
 				pos.x = args[2];
 				pos.y = args[3];
 				
 				return [<CanvasPathElement> {
 					f: CanvasCommand.QuadraticCurve,
-					args: args
+					args: args,
+					from: from
 				}]
 			},
 			regexPattern: [RegexPatterns.Num, RegexPatterns.Num],
@@ -241,11 +289,17 @@ class SVGPath {
 		"Z": <CommandSignature>{
 			toCanvas: (pos: Point, relative: boolean, args: Array<number>) => {
 
+				var from = {
+					x: pos.x,
+					y: pos.y
+				};
+
 				pos.x = args[0];
 				pos.y = args[1];				
 				return [<CanvasPathElement>{
 					f: CanvasCommand.Line,
-					args: args
+					args: args,
+					from: from
 				}];
 			},
 			regexPattern: []
@@ -315,7 +369,11 @@ class SVGPath {
 
 				var canvasCmd: CanvasPathElement = {
 					f: signature.canvasCommand,
-					args: []
+					args: [],
+					from: {
+						x: 0,
+						y: 0
+					}
 				}
 
 				for(var i=0;i<pattern.length;i++) {
@@ -413,10 +471,12 @@ class SVGPath {
 			return {x:u.x + v.x, y: u.y + v.y};
 		}
 		
+		
 		// Convert from endpoint to center parametrization, as detailed in:
 		//   http://www.w3.org/TR/SVG/implnote.html#ArcImplementationNotes
 		if (r.x == 0 || r.y == 0) {
-			return[{f: CanvasCommand.Line, args: [x2.x, x2.y]}];
+			var from: Point = {x: x1.x, y: x1.y};
+			return[{f: CanvasCommand.Line, args: [x2.x, x2.y], from: from}];
 		}
 		var phi = phi * (Math.PI / 180.0);
 		r.x = Math.abs(r.x);
@@ -448,13 +508,15 @@ class SVGPath {
 		var start = theta;
 		var end = theta+deltaTheta;
 		
+
+		
 		return [
-			{f: CanvasCommand.Save, args: []},
-			{f: CanvasCommand.Translate, args: [c.x, c.y]},
-			{f: CanvasCommand.Rotate, args: [phi]},
-			{f: CanvasCommand.Scale, args: [r.x, r.y]},
-			{f: CanvasCommand.EllipticalArc, args: [0, 0, 1, start, end, 1-fS]},
-			{f: CanvasCommand.Restore, args: []}
+			{f: CanvasCommand.Save, args: [], from: from},
+			{f: CanvasCommand.Translate, args: [c.x, c.y], from: from},
+			{f: CanvasCommand.Rotate, args: [phi], from: from},
+			{f: CanvasCommand.Scale, args: [r.x, r.y], from: from},
+			{f: CanvasCommand.EllipticalArc, args: [0, 0, 1, start, end, 1-fS], from: from},
+			{f: CanvasCommand.Restore, args: [], from: from}
 		];
 	}
 	

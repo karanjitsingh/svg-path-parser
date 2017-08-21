@@ -72,7 +72,11 @@ var SVGPath = (function () {
                 };
                 var canvasCmd = {
                     f: signature.canvasCommand,
-                    args: []
+                    args: [],
+                    from: {
+                        x: 0,
+                        y: 0
+                    }
                 };
                 for (var i = 0; i < pattern.length; i++) {
                     matchPattern(RegexPatterns.WS);
@@ -152,7 +156,8 @@ var SVGPath = (function () {
         // Convert from endpoint to center parametrization, as detailed in:
         //   http://www.w3.org/TR/SVG/implnote.html#ArcImplementationNotes
         if (r.x == 0 || r.y == 0) {
-            return [{ f: CanvasCommand.Line, args: [x2.x, x2.y] }];
+            var from = { x: x1.x, y: x1.y };
+            return [{ f: CanvasCommand.Line, args: [x2.x, x2.y], from: from }];
         }
         var phi = phi * (Math.PI / 180.0);
         r.x = Math.abs(r.x);
@@ -180,12 +185,12 @@ var SVGPath = (function () {
         var start = theta;
         var end = theta + deltaTheta;
         return [
-            { f: CanvasCommand.Save, args: [] },
-            { f: CanvasCommand.Translate, args: [c.x, c.y] },
-            { f: CanvasCommand.Rotate, args: [phi] },
-            { f: CanvasCommand.Scale, args: [r.x, r.y] },
-            { f: CanvasCommand.EllipticalArc, args: [0, 0, 1, start, end, 1 - fS] },
-            { f: CanvasCommand.Restore, args: [] }
+            { f: CanvasCommand.Save, args: [], from: from },
+            { f: CanvasCommand.Translate, args: [c.x, c.y], from: from },
+            { f: CanvasCommand.Rotate, args: [phi], from: from },
+            { f: CanvasCommand.Scale, args: [r.x, r.y], from: from },
+            { f: CanvasCommand.EllipticalArc, args: [0, 0, 1, start, end, 1 - fS], from: from },
+            { f: CanvasCommand.Restore, args: [], from: from }
         ];
     };
     SVGPath.prototype.draw = function (ctx) {
@@ -201,11 +206,16 @@ var SVGPath = (function () {
                 var args = args.slice();
                 if (relative)
                     SVGPath.relToAbs(pos, args);
+                var from = {
+                    x: pos.x,
+                    y: pos.y
+                };
                 pos.x = args[0];
                 pos.y = args[1];
                 return [{
                         f: CanvasCommand.Move,
-                        args: args
+                        args: args,
+                        from: from
                     }];
             },
             regexPattern: [RegexPatterns.Num, RegexPatterns.Num]
@@ -216,11 +226,16 @@ var SVGPath = (function () {
                 var args = args.slice();
                 if (relative)
                     SVGPath.relToAbs(pos, args);
+                var from = {
+                    x: pos.x,
+                    y: pos.y
+                };
                 pos.x = args[0];
                 pos.y = args[1];
                 return [{
                         f: CanvasCommand.Line,
-                        args: args
+                        args: args,
+                        from: from
                     }];
             },
             regexPattern: [RegexPatterns.Num, RegexPatterns.Num]
@@ -232,11 +247,16 @@ var SVGPath = (function () {
                 if (relative)
                     args[0] += pos.x;
                 args.push(pos.y);
+                var from = {
+                    x: pos.x,
+                    y: pos.y
+                };
                 pos.x = args[0];
                 pos.y = pos.y;
                 return [{
                         f: CanvasCommand.Line,
-                        args: args
+                        args: args,
+                        from: from
                     }];
             },
             regexPattern: [RegexPatterns.Num],
@@ -248,11 +268,16 @@ var SVGPath = (function () {
                 args.unshift(pos.x);
                 if (relative)
                     args[1] += pos.y;
+                var from = {
+                    x: pos.x,
+                    y: pos.y
+                };
                 pos.x = pos.x;
                 pos.y = args[1];
                 return [{
                         f: CanvasCommand.Line,
-                        args: args
+                        args: args,
+                        from: from
                     }];
             },
             regexPattern: [RegexPatterns.Num],
@@ -263,11 +288,16 @@ var SVGPath = (function () {
                 var args = args.slice();
                 if (relative)
                     SVGPath.relToAbs(pos, args);
+                var from = {
+                    x: pos.x,
+                    y: pos.y
+                };
                 pos.x = args[4];
                 pos.y = args[5];
                 return [{
                         f: CanvasCommand.BezierCurve,
-                        args: args
+                        args: args,
+                        from: from
                     }];
             },
             regexPattern: [RegexPatterns.Num, RegexPatterns.Num, RegexPatterns.Num, RegexPatterns.Num, RegexPatterns.Num, RegexPatterns.Num],
@@ -288,11 +318,16 @@ var SVGPath = (function () {
                 }
                 args.unshift(cp1.y);
                 args.unshift(cp1.x);
+                var from = {
+                    x: pos.x,
+                    y: pos.y
+                };
                 pos.x = args[4];
                 pos.y = args[5];
                 return [{
                         f: CanvasCommand.BezierCurve,
-                        args: args
+                        args: args,
+                        from: from
                     }];
             },
             regexPattern: [RegexPatterns.Num, RegexPatterns.Num, RegexPatterns.Num, RegexPatterns.Num],
@@ -303,11 +338,16 @@ var SVGPath = (function () {
                 var args = args.slice();
                 if (relative)
                     SVGPath.relToAbs(pos, args);
+                var from = {
+                    x: pos.x,
+                    y: pos.y
+                };
                 pos.x = args[2];
                 pos.y = args[3];
                 return [{
                         f: CanvasCommand.QuadraticCurve,
-                        args: args
+                        args: args,
+                        from: from
                     }];
             },
             regexPattern: [RegexPatterns.Num, RegexPatterns.Num, RegexPatterns.Num, RegexPatterns.Num],
@@ -328,11 +368,16 @@ var SVGPath = (function () {
                 }
                 args.unshift(cp1.y);
                 args.unshift(cp1.x);
+                var from = {
+                    x: pos.x,
+                    y: pos.y
+                };
                 pos.x = args[2];
                 pos.y = args[3];
                 return [{
                         f: CanvasCommand.QuadraticCurve,
-                        args: args
+                        args: args,
+                        from: from
                     }];
             },
             regexPattern: [RegexPatterns.Num, RegexPatterns.Num],
@@ -358,11 +403,16 @@ var SVGPath = (function () {
         // Zz
         "Z": {
             toCanvas: function (pos, relative, args) {
+                var from = {
+                    x: pos.x,
+                    y: pos.y
+                };
                 pos.x = args[0];
                 pos.y = args[1];
                 return [{
                         f: CanvasCommand.Line,
-                        args: args
+                        args: args,
+                        from: from
                     }];
             },
             regexPattern: []
