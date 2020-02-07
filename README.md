@@ -1,21 +1,11 @@
 # svg-path-parser
 
+SVG path parser is a custom path 2D parser written specifically for [particle.js](https://github.com/karanjitsingh/particle.js) to support animation for any path. Particle.js requires path length and nth point for each path element that is created in a path 2D, for this very reason I had to write a custom parser that converts those path elements into custom path functions which provide its length and a method to get the nth point on the path.
+
 A simple parser that parses SVG path data and draws it on canvas. This is essentially to support SVG paths in [particle.js](https://github.com/karanjitsingh/particle.js).
 
 ## Notes
-Mapping ```move```, ```line```, ```cubic-bezier``` and ```quadratic-bezier``` from svg to canvas was fairly simple as there is direct support for these commands in ```CanvasRenderingContext2D``` interface.
-
-~~Mapping ```elliptical-arc``` command was however a bit more complex. There is no support for elliptical arcs in the interface so I decided to draw the elliptical arc as a series of bezier curves with a help of a few references.~~
-
-~~Sadly approximating elliptical arcs with bezier curves results in a significant amount of error for large arcs, not sure whether this is due to limitation of float precision in javascript or just the inability of bezier curves to perfectly represent an elliptical arc.~~
-
-![screenshot](http://i.imgur.com/0B1YAfR.png)
-Red line represents svg path and black line represents the mapping along with the approximation of the elliptical arcs.
-
-It seems scaling a circle was way more accurate than approximation.
-
-![screenshot](http://i.imgur.com/DsHhBQX.png)
-
+Mapping ```move```, ```line```, ```cubic-bezier``` and ```quadratic-bezier``` from svg to canvas is fairly simple as there is direct support for these commands in ```CanvasRenderingContext2D``` interface. To map a circle, we rotate and stretch the canvas before drawing an elliptical arc. See http://www.w3.org/TR/SVG/implnote.html#ArcImplementationNotes for how to calculate these rotations and scalings.
 
 ## References
 * [Rendering an SVG elliptical arc as bezier curves](https://mortoray.com/2017/02/16/rendering-an-svg-elliptical-arc-as-bezier-curves/)
